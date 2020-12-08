@@ -1,11 +1,10 @@
 [package]
-name = "day4"
+name = "day5"
 version = "0.1.0"
-authors = ["Gregory Lumen <glumen@blueorigin.com>"]
+authors = ["gremenne <Gregory.Mennenga@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-regex = "1"
-lazy_static = "1.4.0"
+itertools = "0.9.0"

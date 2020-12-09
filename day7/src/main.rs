@@ -68,6 +68,22 @@ impl BagTracker {
                 .flatten())
             .collect()
     }
+
+    fn get_children(&self, bag_name: &String) -> Vec<(u32, &Bag)> {
+        self.get_bag(bag_name).contains.iter().map(|(x,y)| (*x, self.get_bag(y))).collect()
+    }
+
+    fn get_all_children(&self, bag_name: &String) -> Vec<(u32, &Bag)> {
+
+        let mut chidren = self.get_children(bag_name);
+        for (count, child) in self.get_children(bag_name)
+        {
+            let sub_children : Vec<(u32, &Bag)> = self.get_all_children(&child.bag_name).iter().map(|(x,y)|(count*x,*y)).collect();
+            chidren.extend(sub_children);
+        }
+
+        chidren
+    }
 }
 
 fn parse_relationships(src_bag_name: &String, relationships: &String, bags: &mut BagTracker)
@@ -111,8 +127,9 @@ fn main() {
     }
 
     let parents : HashSet<_> = bags.get_all_parents(&"shiny gold".to_string()).into_iter().map(|x| x.bag_name.to_string()).collect();
+    let children : u32 = bags.get_all_children(&"shiny gold".to_string()).into_iter().map(|(count, _)| count).sum();
 
-    println!("{}", parents.len());
+    println!("{}, {}", parents.len(), children);
 
 }
 

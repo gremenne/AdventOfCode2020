@@ -1,11 +1,10 @@
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-use itertools::sorted;
 
 struct BordingPass {
-    row: i32,
-    column: i32,
+    _row: i32,
+    _column: i32,
     id: i32,
 }
 
@@ -31,8 +30,8 @@ fn parse_bording_pass(line: &String) -> BordingPass {
         .sum();
 
     BordingPass {
-        row: row, 
-        column: column,
+        _row: row, 
+        _column: column,
         id: row*8 + column }
 }
 

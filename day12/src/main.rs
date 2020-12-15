@@ -76,10 +76,13 @@ fn parse_action(string: &String) -> ActionEnum {
     }
 }
 
-fn part_1(lines: &Vec<String>)
-{
-    let actions : Vec<ActionEnum> = lines.iter().map(|x| parse_action(x)).collect();
-    let end_point = actions.iter().fold(State1{x:0.0,y:0.0,heading:0.0}, |state, action| update1(&state, action));
+fn part_1(lines: &Vec<String>) {
+
+    let end_point = lines.iter()
+        .map(|x| parse_action(x))
+        .fold(
+            State1{x:0.0,y:0.0,heading:0.0}, 
+            |state, action| update1(&state, &action));
 
     println!("{}", end_point.x.abs() + end_point.y.abs())
 }
@@ -130,8 +133,11 @@ fn update2(state: &State2, action: &ActionEnum) -> State2 {
 
 fn part_2(lines: &Vec<String>)
 {
-    let actions : Vec<ActionEnum> = lines.iter().map(|x| parse_action(x)).collect();
-    let end_point = actions.iter().fold(State2{x:0.0,y:0.0,wx:10.0,wy:1.0}, |state, action| update2(&state, action));
+    let end_point = lines.iter()
+        .map(|x| parse_action(x))
+        .fold(
+            State2{x:0.0,y:0.0,wx:10.0,wy:1.0},
+            |state, action| update2(&state, &action));
 
     println!("{}", end_point.x.abs() + end_point.y.abs())
 }

@@ -35,12 +35,6 @@ enum Direction {
 type Edge = Vec<bool>;
 type Image = Vec<Vec<bool>>;
 
-#[derive(Clone, Debug, PartialEq)]
-struct MapTile {
-    id: u32,
-    image: Image,
-}
-
 #[derive(Hash, Copy, Clone, Debug, PartialEq, Eq)]
 struct Position {
     x: i32,
@@ -81,85 +75,18 @@ impl Position {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-struct OrientedMapTile<'a> {
-    rotation: Rotation,
-    flip: Flip,
-    tile: &'a MapTile,
+fn flip(edge: &Edge) -> Edge {
+    edge.iter().rev().cloned().collect()
 }
 
-impl<'a> OrientedMapTile<'a> {
-    fn new(tile: &'a MapTile, rotation: Rotation, flip: Flip) -> OrientedMapTile<'a> {
-        OrientedMapTile{
-            rotation: rotation,
-            flip: flip,
-            tile: tile,
-        }
-    }
-
-    fn get_edge(&self, direction: &Direction) -> Edge {
-        let origional_edge = rotate(&direction, &self.rotation);
-        self.tile.get_edge(&origional_edge)
-        // TODO: Actually implement flipping, and make sure rotation logic is correct
-    }
+trait TileWithEdges {
+    fn get_id(&self) -> u32;
+    fn get_edge(&self, direction: &Direction) -> Edge;
 }
 
-struct Map<'a> {
-    positions: HashMap<Position, Option<OrientedMapTile<'a>>>,
-}
-
-impl<'a> Map<'a> {
-
-    fn new() -> Map<'a> {
-        Map{
-            positions: HashMap::new(),
-        }
-    }
-
-    fn add_tile(mut self, pos: &Position, orientation: Orientation, tile: &'a MapTile) -> Map<'a>  {
-        self.positions.insert(*pos, Some(OrientedMapTile::new(tile, orientation)));
-        self._spawn_neighbors(pos);
-        self
-    }
-    
-    fn _spawn_neighbors(&mut self, pos: &Position) {
-        for neighbor_pos in pos.neighbors().iter() {
-            if !self.positions.contains_key(&neighbor_pos) {
-                self.positions.insert(*neighbor_pos, None);
-            }
-        }
-    }
-    
-    fn get_tile_at_pos(&'a self, pos: &Position) -> Option<&OrientedMapTile<'a>> {
-        match self.positions.get(&pos)
-        {
-            Some(tile_option) => tile_option.as_ref(),
-            None => None
-        }
-    }
-    
-    fn get_empty_positions(&'a self) -> impl Iterator<Item=Position> + 'a {
-        self.positions.keys().filter(move |key| self.positions[key].is_none()).cloned()
-    }
-    
-}
-
-fn rotate90cw (direction: &Direction) -> Direction {
-    match direction {
-        Direction::North => Direction::West,
-        Direction::East => Direction::North,
-        Direction::South => Direction::East,
-        Direction::West => Direction::South }
-}
-
-fn rotate(direction: &Direction, rotation: &Rotation) -> Direction {
-
-    match orientation {
-        Rotation::NoRotation => direction.clone(),
-        Rotation::Rotate90CW => rotate90cw(direction),
-        Rotation::Rotate180CW => rotate90cw(&rotate90cw(direction)),
-        Rotation::Rotate270CW => rotate90cw(&rotate90cw(&rotate90cw(direction))),
-    }
+struct MapTile {
+    id: u32,
+    image: Image,
 }
 
 impl MapTile {
@@ -168,6 +95,12 @@ impl MapTile {
             id: id,
             image: image,
         }
+    }
+}
+
+impl TileWithEdges for MapTile {
+    fn get_id(&self) -> u32 {
+        self.id
     }
 
     fn get_edge(&self, direction: &Direction) -> Edge {
@@ -180,6 +113,130 @@ impl MapTile {
     }
 }
 
+struct Rotated90CwMapTile<'a> {
+    tile: &'a dyn TileWithEdges,
+}
+
+impl<'a> Rotated90CwMapTile<'a> {
+    fn new(tile: &'a dyn TileWithEdges) -> Rotated90CwMapTile<'a> {
+        Rotated90CwMapTile{
+            tile: tile,
+        }
+    }
+}
+
+impl<'a> TileWithEdges for Rotated90CwMapTile<'a> {
+
+    fn get_id(&self) -> u32 {
+        self.tile.get_id()
+    }
+
+    fn get_edge(&self, direction: &Direction) -> Edge {
+        match direction {
+            Direction::North => flip(&self.tile.get_edge(&Direction::West)),
+            Direction::East => self.tile.get_edge(&Direction::North),
+            Direction::South => flip(&self.tile.get_edge(&Direction::East)),
+            Direction::West => self.tile.get_edge(&Direction::South),
+        }
+    }
+}
+
+struct VerticallyFlippedMapTile<'a> {
+    tile: &'a dyn TileWithEdges,
+}
+
+impl<'a> VerticallyFlippedMapTile<'a> {
+    fn new(tile: &'a dyn TileWithEdges) -> VerticallyFlippedMapTile<'a> {
+        VerticallyFlippedMapTile{
+            tile: tile,
+        }
+    }
+}
+
+impl<'a> TileWithEdges for VerticallyFlippedMapTile<'a> {
+
+    fn get_id(&self) -> u32 {
+        self.tile.get_id()
+    }
+
+    fn get_edge(&self, direction: &Direction) -> Edge {
+        match direction {
+            Direction::North => self.tile.get_edge(&Direction::South),
+            Direction::East => flip(&self.tile.get_edge(&Direction::West)),
+            Direction::South => self.tile.get_edge(&Direction::North),
+            Direction::West => flip(&self.tile.get_edge(&Direction::East)),
+        }
+    }
+}
+
+struct HorizontallyFlippedMapTile<'a> {
+    tile: &'a dyn TileWithEdges,
+}
+
+impl<'a> HorizontallyFlippedMapTile<'a> {
+    fn new(tile: &'a dyn TileWithEdges) -> HorizontallyFlippedMapTile<'a> {
+        HorizontallyFlippedMapTile{
+            tile: tile,
+        }
+    }
+}
+
+impl<'a> TileWithEdges for HorizontallyFlippedMapTile<'a> {
+
+    fn get_id(&self) -> u32 {
+        self.tile.get_id()
+    }
+
+    fn get_edge(&self, direction: &Direction) -> Edge {
+        match direction {
+            Direction::North => flip(&self.tile.get_edge(&Direction::North)),
+            Direction::East =>  self.tile.get_edge(&Direction::West),
+            Direction::South => flip(&self.tile.get_edge(&Direction::South)),
+            Direction::West =>  self.tile.get_edge(&Direction::East),
+        }
+    }
+}
+
+struct Map<'a> {
+    positions: HashMap<Position, Option<&'a dyn TileWithEdges>>,
+}
+
+impl<'a> Map<'a> {
+
+    fn new() -> Map<'a> {
+        Map{
+            positions: HashMap::new(),
+        }
+    }
+
+    fn add_tile(mut self, pos: &Position, tile: &'a dyn TileWithEdges) -> Map<'a>  {
+        self.positions.insert(*pos, Some(tile));
+        self._spawn_neighbors(pos);
+        self
+    }
+    
+    fn _spawn_neighbors(&mut self, pos: &Position) {
+        for neighbor_pos in pos.neighbors().iter() {
+            if !self.positions.contains_key(&neighbor_pos) {
+                self.positions.insert(*neighbor_pos, None);
+            }
+        }
+    }
+    
+    fn get_tile_at_pos(&'a self, pos: &Position) -> Option<&'a dyn TileWithEdges> {
+        match self.positions.get(&pos)
+        {
+            Some(tile_option) => *tile_option,
+            None => None
+        }
+    }
+    
+    fn get_empty_positions(&'a self) -> impl Iterator<Item=Position> + 'a {
+        self.positions.keys().filter(move |key| self.positions[key].is_none()).cloned()
+    }
+    
+}
+
 fn check_edge_match(base_edge: Edge, candidate: Option<Edge>) -> bool {
     println!("        {:?} + {:?}", base_edge, candidate);
 
@@ -187,9 +244,6 @@ fn check_edge_match(base_edge: Edge, candidate: Option<Edge>) -> bool {
         Some(edge) => base_edge == edge,
         None => true,
     };
-
-    println!("          {}", result);
-
     result
 }
 
@@ -204,12 +258,8 @@ fn get_ajacent_edge_in_direction<'a>(map: &'a Map, pos:&Position, direction: &Di
 
     let adj_tile = map.get_tile_at_pos(&adj_pos);
     if adj_tile.is_some(){
-        println!("      Looking at the {:?} Edge of {} ({:?})", mirrored_edge, adj_tile.unwrap().tile.id, adj_pos);
+        println!("      Looking at the {:?} Edge of {} ({:?})", mirrored_edge, adj_tile.unwrap().get_id(), adj_pos);
     }
-    else {
-        println!("      No tile currently at {:?}", adj_pos);
-    }
-
 
     match map.get_tile_at_pos(&adj_pos) {
         Some(tile) => Some(tile.get_edge(&mirrored_edge)),
@@ -217,18 +267,53 @@ fn get_ajacent_edge_in_direction<'a>(map: &'a Map, pos:&Position, direction: &Di
     }
 }
 
-fn check_match_in_direction(new_tile: &OrientedMapTile, map: &Map, pos: &Position, direction: &Direction ) -> bool {
+fn check_match_in_direction(new_tile: &dyn TileWithEdges, map: &Map, pos: &Position, direction: &Direction ) -> bool {
     println!("      Checking Edge {:?} of {:?}", direction, pos);
     check_edge_match(new_tile.get_edge(direction), get_ajacent_edge_in_direction(map, pos, direction))
 }
 
-fn check_match(new_tile: &OrientedMapTile, map: &Map, pos: &Position ) -> bool {
+fn check_match(new_tile: &dyn TileWithEdges, map: &Map, pos: &Position ) -> bool {
     Direction::iter()
         .map(|dir| check_match_in_direction(new_tile, map, pos, &dir))
         .all(|x| x==true)
 }
 
-fn try_rotate_and_match<'a>(new_tile: &'a MapTile, map: &'a Map<'a>,) -> Option<(Position, Orientation)> {
+fn rotate<'a>(tile: &'a dyn TileWithEdges) -> impl TileWithEdges +'a {
+    Rotated90CwMapTile::new(tile)
+}
+
+fn vflip<'a>(tile: &'a dyn TileWithEdges) -> impl TileWithEdges +'a {
+    VerticallyFlippedMapTile::new(tile)
+}
+
+fn hflip<'a>(tile: &'a dyn TileWithEdges) -> impl TileWithEdges +'a {
+    HorizontallyFlippedMapTile::new(tile)
+}
+
+fn get_permutations<'a>(tile: &'a MapTile) -> std::slice::Iter<'a, &dyn TileWithEdges> {
+    let permutations : Vec<&'a dyn TileWithEdges> = vec![ 
+      tile,
+      &rotate(tile),
+      &rotate(&rotate(tile)),
+      &rotate(&rotate(&rotate(tile))),
+      &vflip(tile),
+      &rotate(&vflip(tile)),
+      &rotate(&rotate(&vflip(tile))),
+      &rotate(&rotate(&rotate(&vflip(tile)))),
+      &hflip(tile),
+      &rotate(&hflip(tile)),
+      &rotate(&rotate(&hflip(tile))),
+      &rotate(&rotate(&rotate(&hflip(tile)))),
+      &vflip(&hflip(tile)),
+      &rotate(&vflip(&hflip(tile))),
+      &rotate(&rotate(&vflip(&hflip(tile)))),
+      &rotate(&rotate(&rotate(&vflip(&hflip(tile))))),
+    ];
+
+    permutations.iter()
+}
+
+fn try_rotate_and_match<'a>(new_tile: &'a MapTile, map: &Map,) -> Option<(Position, &'a dyn TileWithEdges)> {
 
     println!("Attempting to fit {}", new_tile.id);
     let mut _input = String::new();
@@ -238,12 +323,9 @@ fn try_rotate_and_match<'a>(new_tile: &'a MapTile, map: &'a Map<'a>,) -> Option<
 
     for pos in empty_positions.iter() {
         println!("  Trying Position {:?}", pos);
-        for orientation in Orientation::iter() {
-            println!("    Trying Orientation {:?}", orientation);
-            let oriented_tile = OrientedMapTile::new(new_tile, orientation.clone());
-    
-            if check_match(&oriented_tile, map, &pos) {
-                return Some((*pos, orientation));
+        for orientation in get_permutations(new_tile) {
+            if check_match(*orientation, map, &pos) {
+                return Some((*pos, *orientation));
             }
         }
     }
@@ -253,7 +335,7 @@ fn try_rotate_and_match<'a>(new_tile: &'a MapTile, map: &'a Map<'a>,) -> Option<
 }
 
 fn id_at_position(position: &Position, map: &Map) -> u32 {
-    map.get_tile_at_pos(position).unwrap().tile.id
+    map.get_tile_at_pos(position).unwrap().get_id()
 }
 
 fn part_1(tiles: &Vec<MapTile>) {
@@ -261,14 +343,16 @@ fn part_1(tiles: &Vec<MapTile>) {
 
     let mut tile_refs : VecDeque<&MapTile> = tiles.iter().collect();
 
-    map = map.add_tile(&Position::new(0,0), Orientation::NoChange, tile_refs.pop_front().unwrap());
+    map = map.add_tile(
+        &Position::new(0,0), 
+        tile_refs.pop_front().unwrap());
 
     while !tile_refs.is_empty() {
         let tile : &MapTile = tile_refs.pop_front().unwrap();
 
-        if let Some((pos, orientation)) = try_rotate_and_match(&tile, &map) {
-            println!("Fitting {} to {:?} with {:?}", tile.id, pos, orientation);
-            map = map.add_tile(&pos, orientation, tile);
+        if let Some((pos, tile)) = try_rotate_and_match(&tile, &map) {
+            println!("Fitting {} to {:?}", tile.get_id(), pos);
+            map = map.add_tile(&pos, tile);
         }
         else {
             tile_refs.push_back(tile);
